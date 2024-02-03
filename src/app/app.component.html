@@ -1,0 +1,4 @@
+<div *ngFor="let todo of todos">
+  {{ todo.title }}
+  <button (click)="update(todo)">Update</button>
+</div>
