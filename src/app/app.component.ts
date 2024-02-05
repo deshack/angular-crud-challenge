@@ -1,51 +1,94 @@
 import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { randText } from '@ngneat/falso';
+import { ApiService } from './Services/api.service';
+import { Todo } from './Interfaces/todo';
+import { TodoListSignalService } from './Services/todo-list-signal.service';
+import { ErrorHandlingService } from './Services/error.handling.service';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+
 
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MatProgressSpinnerModule, MatButtonModule, MatIconModule],
   selector: 'app-root',
-  template: `
-    <div *ngFor="let todo of todos">
-      {{ todo.title }}
-      <button (click)="update(todo)">Update</button>
-    </div>
-  `,
-  styles: [],
+  templateUrl: 'app.component.html',
+  styleUrls: ['./app.component.css']
 })
 export class AppComponent implements OnInit {
-  todos!: any[];
+  // Variable to hold the list of todos
+  todos!: Todo[];
 
-  constructor(private http: HttpClient) {}
+  // Loading flag to indicate whether todos are being loaded
+  loading = true;
+
+  constructor(private apiService: ApiService,
+    private todoListSignalService: TodoListSignalService,
+    private errorHandlingService: ErrorHandlingService
+    ) {}
+
 
   ngOnInit(): void {
-    this.http
-      .get<any[]>('https://jsonplaceholder.typicode.com/todos')
-      .subscribe((todos) => {
+    // Call the service to get the data
+    this.apiService.getTodo().subscribe({
+      next: (todos) => {
+        // Update state variables
         this.todos = todos;
-      });
+        this.loading = false;
+        console.log('Todo list updated signal received!');
+      },
+      error: (error) => {
+        // Handle errors in fetching todos
+        console.error('Error fetching todos:', error);
+        this.loading = false;
+        this.errorHandlingService.handleError('An error occurred while fetching todos.');
+      }
+    });
   }
 
-  update(todo: any) {
-    this.http
-      .put<any>(
-        `https://jsonplaceholder.typicode.com/todos/${todo.id}`,
-        JSON.stringify({
-          todo: todo.id,
-          title: randText(),
-          body: todo.body,
-          userId: todo.userId,
-        }),
-        {
-          headers: {
-            'Content-type': 'application/json; charset=UTF-8',
-          },
-        },
-      )
-      .subscribe((todoUpdated: any) => {
-        this.todos[todoUpdated.id - 1] = todoUpdated;
-      });
+  update(todo: Todo) {
+    // Create a new updated todo with a random text
+    const updatedTodo: Todo = {
+      ...todo,
+      title: randText(),
+    };
+
+    // Call the service to update the data
+    this.apiService.updateTodo(updatedTodo).subscribe({
+      next: (todoUpdated: Todo) => {
+        // Update the list of todos
+        this.todos = this.todos.map(t => (t.id === todoUpdated.id ? todoUpdated : t));
+        console.log('Todo updated successfully');
+        // Emit a signal to notify the update
+        this.todoListSignalService.emitTodoListUpdated();
+        console.log('Todo list updated signal received!');
+      },
+      error: (error) => {
+        // Handle errors in updating todo
+        console.error('Error updating todo:', error);
+        this.errorHandlingService.handleError('An error occurred while updating the todo.');
+      },
+    });
+  }
+
+  delete(todoId: number) {
+    // Call the service to delete the todo
+    this.apiService.deleteTodo(todoId).subscribe({
+      next: () => {
+        // Filter todos to remove the deleted one
+        this.todos = this.todos.filter(t => t.id !== todoId);
+        // Emit a signal to notify the update
+        this.todoListSignalService.emitTodoListUpdated();
+        console.log('Todo deleted successfully');
+        console.log('Todo list updated signal received!');
+      },
+      error: (error) => {
+        // Handle errors in deleting todo
+        console.error('Error deleting todo:', error);
+        this.errorHandlingService.handleError('An error occurred while deleting the todo.');
+      }
+    });
   }
 }
