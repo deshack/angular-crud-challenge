@@ -11,11 +11,11 @@ export class ApiService {
 
   constructor(private http: HttpClient) {}
 
-  getData(): Observable<Todo[]> {
+  getTodo(): Observable<Todo[]> {
     return this.http.get<Todo[]>(this.apiUrl);
   }
 
-  updateData(todo: Todo): Observable<Todo> {
+  updateTodo(todo: Todo): Observable<Todo> {
     const url = `${this.apiUrl}/${todo.id}`;
     return this.http.put<Todo>(url, todo);
   }
